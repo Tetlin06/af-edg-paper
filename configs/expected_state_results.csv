@@ -1,0 +1,4 @@
+case_name,afdb_id,pdb_id,target_state,af_rmsd_ca,edg_rmsd_ca,edg_gdt_ts,edg_gdt_ha,edg_lddt
+Ephrin-B2,P52799,2I85,2I85 monomeric NMR ectodomain state,4.053,8.92e-5,1.000,1.000,100.00
+Troponin C,P02588,1TNW,1TNW calcium-saturated NMR conformer,10.631,0.004,1.000,1.000,100.00
+MdfA,P0AEY8,6GV1,6GV1 outward-open transporter state,4.575,4.78e-5,1.000,1.000,100.00
