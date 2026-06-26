@@ -34,7 +34,7 @@ for k = 1:numel(targetFiles)
     end
 
     T = T(:, required);
-    T_all = [T_all; T]; %#ok<AGROW>
+    T_all = [T_all; T]; 
 end
 
 if isempty(T_all)
@@ -46,7 +46,7 @@ T_all = T_all(ia, :);
 
 tmpCSV = fullfile('configs', '_mapping_targets_tmp.csv');
 writetable(T_all, tmpCSV);
-cleanupObj = onCleanup(@() delete_if_exists(tmpCSV)); %#ok<NASGU>
+cleanupObj = onCleanup(@() delete_if_exists(tmpCSV)); 
 
 build_pdb_uniprot_mapping_cache( ...
     tmpCSV, ...
