@@ -182,25 +182,25 @@ function out = build_aligned_all_atom_pairs(alignment, truePdbPath, trueChain, a
 
             atomCounter = atomCounter + 1;
 
-            atomRow_col(end+1,1) = atomCounter; %#ok<AGROW>
-            residuePairIndex_col(end+1,1) = r; %#ok<AGROW>
-            alignedPairPos_col(end+1,1) = r; %#ok<AGROW>
+            atomRow_col(end+1,1) = atomCounter; 
+            residuePairIndex_col(end+1,1) = r; 
+            alignedPairPos_col(end+1,1) = r; 
 
-            trueResid_col(end+1,1) = tr; %#ok<AGROW>
-            afResid_col(end+1,1) = ar; %#ok<AGROW>
-            trueChainResid_col(end+1,1) = trueChainResid; %#ok<AGROW>
-            afChainResid_col(end+1,1) = afChainResid; %#ok<AGROW>
+            trueResid_col(end+1,1) = tr; 
+            afResid_col(end+1,1) = ar; 
+            trueChainResid_col(end+1,1) = trueChainResid; 
+            afChainResid_col(end+1,1) = afChainResid; 
 
-            trueResSeq_col(end+1,1) = resseqTrue(r); %#ok<AGROW>
-            afResSeq_col(end+1,1) = resseqAF(r); %#ok<AGROW>
+            trueResSeq_col(end+1,1) = resseqTrue(r); 
+            afResSeq_col(end+1,1) = resseqAF(r); 
 
-            trueResName_col(end+1,1) = trueResName; %#ok<AGROW>
-            afResName_col(end+1,1) = afResName; %#ok<AGROW>
-            trueAA_col(end+1,1) = trueAA; %#ok<AGROW>
-            afAA_col(end+1,1) = afAA; %#ok<AGROW>
-            sameAA_col(end+1,1) = sameAA; %#ok<AGROW>
+            trueResName_col(end+1,1) = trueResName; 
+            afResName_col(end+1,1) = afResName; 
+            trueAA_col(end+1,1) = trueAA; 
+            afAA_col(end+1,1) = afAA; 
+            sameAA_col(end+1,1) = sameAA; 
 
-            atomName_col(end+1,1) = atomName; %#ok<AGROW>
+            atomName_col(end+1,1) = atomName; 
 
             isBackbone = ismember(atomName, backboneAtoms);
             isCA = atomName == "CA";
@@ -213,23 +213,23 @@ function out = build_aligned_all_atom_pairs(alignment, truePdbPath, trueChain, a
                 atomClass = "sidechain";
             end
 
-            atomClass_col(end+1,1) = atomClass; %#ok<AGROW>
+            atomClass_col(end+1,1) = atomClass; 
 
-            trueAtomIndex_col(end+1,1) = trow.atomIndex; %#ok<AGROW>
-            afAtomIndex_col(end+1,1) = arow.atomIndex; %#ok<AGROW>
-            trueAtomKey_col(end+1,1) = string(trow.atomKey); %#ok<AGROW>
-            afAtomKey_col(end+1,1) = string(arow.atomKey); %#ok<AGROW>
+            trueAtomIndex_col(end+1,1) = trow.atomIndex; 
+            afAtomIndex_col(end+1,1) = arow.atomIndex; 
+            trueAtomKey_col(end+1,1) = string(trow.atomKey); 
+            afAtomKey_col(end+1,1) = string(arow.atomKey); 
 
-            xT_col(end+1,1) = trow.x; %#ok<AGROW>
-            yT_col(end+1,1) = trow.y; %#ok<AGROW>
-            zT_col(end+1,1) = trow.z; %#ok<AGROW>
+            xT_col(end+1,1) = trow.x; 
+            yT_col(end+1,1) = trow.y; 
+            zT_col(end+1,1) = trow.z; 
 
-            xA_col(end+1,1) = arow.x; %#ok<AGROW>
-            yA_col(end+1,1) = arow.y; %#ok<AGROW>
-            zA_col(end+1,1) = arow.z; %#ok<AGROW>
+            xA_col(end+1,1) = arow.x; 
+            yA_col(end+1,1) = arow.y; 
+            zA_col(end+1,1) = arow.z; 
 
-            isCA_col(end+1,1) = isCA; %#ok<AGROW>
-            isBackbone_col(end+1,1) = isBackbone; %#ok<AGROW>
+            isCA_col(end+1,1) = isCA; 
+            isBackbone_col(end+1,1) = isBackbone; 
         end
     end
 
