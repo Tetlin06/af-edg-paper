@@ -1,39 +1,62 @@
-% PAPER_REPO_PATH_SETUP
-this_script = string(mfilename('fullpath'));
-if strlength(this_script) == 0
-    repo_root = pwd;
-else
-    repo_root = fileparts(fileparts(char(this_script)));
-end
-cd(repo_root);
-addpath(genpath(fullfile(repo_root, 'src')));
+% BUILD_MAPPING_CACHE
+%
+% Build the local PDB-to-UniProt residue mapping cache from the committed
+% target sheets and local SIFTS XML files.
 
-out_csv = fullfile('configs', 'pdb_uniprot_residue_map.csv');
-target_files = [ ...
-    string(fullfile('configs', 'exact_targets.csv')), ...
-    string(fullfile('configs', 'noisy_targets.csv')), ...
-    string(fullfile('configs', 'state_targets.csv'))];
+close all force;
+
+repoRoot = fileparts(fileparts(mfilename('fullpath')));
+cd(repoRoot);
+addpath(genpath(fullfile(repoRoot, 'src')));
+
+targetFiles = [
+    "configs/exact_targets.csv"
+    "configs/noisy_targets.csv"
+    "configs/state_targets.csv"
+];
 
 T_all = table();
-for k = 1:numel(target_files)
-    paper_check_targets(target_files(k));
-    tmp_csv = fullfile(tempdir, sprintf('paper_sifts_%d.csv', k));
-    T = build_pdb_uniprot_mapping_cache(target_files(k), ...
-        'OutCSV', tmp_csv, ...
-        'SiftsDir', fullfile('data', 'SIFTS'), ...
-        'SkipMissing', false, ...
-        'Verbose', false);
-    T_all = paper_append_row(T_all, T);
+
+for k = 1:numel(targetFiles)
+    f = targetFiles(k);
+
+    if ~isfile(f)
+        continue;
+    end
+
+    T = readtable(f, 'FileType', 'text', 'VariableNamingRule', 'preserve');
+
+    required = {'AFDB ID', 'PDB ID', 'Chain ID'};
+    for r = 1:numel(required)
+        if ~any(strcmp(required{r}, T.Properties.VariableNames))
+            error('Target file %s is missing required column: %s', f, required{r});
+        end
+    end
+
+    T = T(:, required);
+    T_all = [T_all; T]; %#ok<AGROW>
 end
 
 if isempty(T_all)
-    error('No SIFTS mapping rows were generated.');
+    error('No target rows found.');
 end
 
-key = string(T_all.AFDB_ID) + "|" + string(T_all.PDB_ID) + "|" + ...
-      string(T_all.Chain_ID) + "|" + string(T_all.PDB_resNum) + "|" + ...
-      string(T_all.PDB_iCode) + "|" + string(T_all.UniProt_resNum);
-[~, ia] = unique(key, 'stable');
+[~, ia] = unique(strcat(string(T_all.("AFDB ID")), "|", string(T_all.("PDB ID")), "|", string(T_all.("Chain ID"))), 'stable');
 T_all = T_all(ia, :);
 
-writetable(T_all, out_csv);
+tmpCSV = fullfile('configs', '_mapping_targets_tmp.csv');
+writetable(T_all, tmpCSV);
+cleanupObj = onCleanup(@() delete_if_exists(tmpCSV)); %#ok<NASGU>
+
+build_pdb_uniprot_mapping_cache( ...
+    tmpCSV, ...
+    'SiftsDir', fullfile('data', 'SIFTS'), ...
+    'OutCSV', fullfile('configs', 'pdb_uniprot_residue_map.csv'), ...
+    'SkipMissing', false, ...
+    'Verbose', false);
+
+function delete_if_exists(path)
+    if isfile(path)
+        delete(path);
+    end
+end

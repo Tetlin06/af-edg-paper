@@ -4,11 +4,13 @@
 *.fig
 slprj/
 codegen/
-results/generated/*
-!results/generated/.gitkeep
-logs/
+
 out/
 out_*/
+logs/
+local/
+results/
+
 data/PDB/*
 data/AFDB/*
 data/SIFTS/*
@@ -16,8 +18,16 @@ data/SIFTS/*
 !data/AFDB/.gitkeep
 !data/SIFTS/.gitkeep
 !data/README.md
+
 configs/pdb_uniprot_residue_map.csv
-local/
+configs/_mapping_targets_tmp.csv
+
+*.zip
+*.pdf
+Pasted text*.txt
+CB NEW.txt
+Data file mismatches.txt
+
 .DS_Store
 .vscode/
 .idea/
