@@ -405,7 +405,7 @@ function [status, msg, elapsedSec] = run_one_initialization(problem, initCase, o
 
         oldFigVisible = get(0, 'DefaultFigureVisible');
         set(0, 'DefaultFigureVisible', 'off');
-        cleanupFig = onCleanup(@() set(0, 'DefaultFigureVisible', oldFigVisible)); %#ok<NASGU>
+        cleanupFig = onCleanup(@() set(0, 'DefaultFigureVisible', oldFigVisible)); 
 
         captured = evalc(['[GCor, IPM_Recon, output] = alternating_completion(', ...
             'problem.DistSq, problem.Weight, pointInitial, opts, lsopts);']);
@@ -543,7 +543,7 @@ function records = append_record(records, rec)
     if isempty(records)
         records = rec;
     else
-        records(end+1) = rec; %#ok<AGROW>
+        records(end+1) = rec; 
     end
 end
 
@@ -634,6 +634,6 @@ function write_text(path, txt)
     if fid < 0
         error('Could not open file for writing: %s', path);
     end
-    cleaner = onCleanup(@() fclose(fid)); %#ok<NASGU>
+    cleaner = onCleanup(@() fclose(fid)); 
     fprintf(fid, '%s', char(string(txt)));
 end
