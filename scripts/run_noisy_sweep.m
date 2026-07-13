@@ -129,8 +129,7 @@ function manifest = run_noisy_sweep_impl( ...
     afdbIDs = afdbIDs(afdbIDs ~= "");
 
     edgeKeepFraction = 1;
-    edgeRoot = fullfile(outRoot, format_edgekeep_folder(edgeKeepFraction));
-    cutoffRoot = fullfile(edgeRoot, format_cutoff_folder(trueCutoff));
+    cutoffRoot = fullfile(outRoot, format_cutoff_folder(trueCutoff));
     initVariant = char("init_AF_rank_jitter" + string(format_jitter(afRankJitter)));
 
     manifestRecords = init_manifest_records();
