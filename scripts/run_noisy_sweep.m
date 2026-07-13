@@ -1,9 +1,9 @@
 % RUN_NOISY_SWEEP
 %
-% Run from the repository root with:
+% Run with:
 %   run('scripts/run_noisy_sweep.m')
 %
-%
+% Output layout:
 %   outRoot/edgekeep_100/cutoff_06/<AFDB_ID>/K_0p00333/
 %       noise_seed_003/shared/
 %       noise_seed_003/runs/init_AF_rank_jitter1e-3/
