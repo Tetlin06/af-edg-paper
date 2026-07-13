@@ -5,17 +5,6 @@
 % Run from the repository root with:
 %   run('scripts/run_noisy_sweep.m')
 %
-% This script is intentionally stripped down. It always uses:
-%   - all-atom matched nodes
-%   - the complete cutoff-defined edge set (edgekeep_100)
-%   - a 6 Angstrom cutoff
-%   - chemistry-aware noise with protected local chemistry edges
-%   - AF-rank initialization only
-%   - alternating_completion_noisy
-%   - no added true edges, no added AlphaFold edges, no edge subsampling,
-%     no alternative initializations, and no handedness/chirality correction
-%
-% Folder layout matches run_init_cutoff_sweep exactly below outRoot:
 %
 %   outRoot/edgekeep_100/cutoff_06/<AFDB_ID>/K_0p00333/
 %       noise_seed_003/shared/
