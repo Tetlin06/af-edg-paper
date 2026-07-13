@@ -1,92 +1,104 @@
 # AlphaFold-initialized all-atom EDG sweep code
 
-Minimal MATLAB code for running exact and noisy all-atom EDG sweep scripts.
+This repository contains the custom MATLAB code and target configuration files used to construct matched all-atom point clouds and run the AF-EDG reconstructions reported in the manuscript.
 
-Before running either sweep, build the local alignment cache:
+## Repository scope
+
+The repository contains reconstruction code, target lists, and fixed run settings. It does **not** contain third-party PDB, AlphaFold Database, or SIFTS files; generated files under `out/`; manuscript result tables; or figure source data. The numerical source values underlying the noisy plots in Fig. 2a,b are supplied with the article as **Supplementary Data 1**.
+
+## Requirements
+
+- MATLAB R[INSERT VERSION]
+- Bioinformatics Toolbox [INSERT VERSION]
+- Any additional MATLAB toolboxes actually used: [INSERT OR DELETE]
+
+PDB parsing uses `pdbread` from the Bioinformatics Toolbox.
+
+## Local structural-data layout
+
+Download the public inputs from their original databases and place them as follows:
+
+```text
+data/PDB/<PDB_ID>.pdb
+data/AFDB/<AFDB_ID>.pdb
+data/SIFTS/<pdb_id>.xml        # or .xml.gz
+```
+
+The exact PDB IDs, AlphaFold/UniProt identifiers, and chain IDs used by each analysis are listed in:
+
+```text
+configs/exact_targets.csv
+configs/noisy_targets.csv
+configs/state_targets.csv
+```
+
+Build the local PDB-to-UniProt mapping cache before running a sweep:
 
 ```bash
 matlab -batch "run('scripts/build_mapping_cache.m')"
 ```
 
-Exact sweep:
-
-```bash
-matlab -batch "run('scripts/run_exact_sweep.m')"
-```
-
-Noisy sweep:
-
-```bash
-matlab -batch "run('scripts/run_noisy_sweep.m')"
-```
-
-## Local data layout
-
-Structural data are not committed.
-
-Place files here:
-
-```text
-data/PDB/<PDB_ID>.pdb
-data/AFDB/<AFDB_ID>.pdb
-data/SIFTS/<pdb_id>.xml or <pdb_id>.xml.gz
-```
-
-The generated mapping cache is local:
+This creates the local, untracked file:
 
 ```text
 configs/pdb_uniprot_residue_map.csv
 ```
 
-and is not committed.
+## Exact reconstruction sweep
 
-## Target sheets
+```bash
+matlab -batch "run('scripts/run_exact_sweep.m')"
+```
 
-The exact sweep uses:
+## Noisy reconstruction sweep used in the manuscript
+
+```bash
+matlab -batch "run('scripts/run_noisy_sweep.m')"
+```
+
+The script runs every combination below for both rows in `configs/noisy_targets.csv`:
+
+| Setting | Value used in the manuscript |
+|---|---|
+| All-atom cutoff | 6 Å |
+| Nominal noise levels, eta | 0.01 and 0.05 |
+| Implemented multiplicative scales, K | eta / 3 |
+| Noise seeds | 3, 21, 450, 666, 987 |
+| Initialization | AF-rank |
+| AF-rank embedding seed | 47 |
+| AF-rank jitter | 1e-3 |
+| Solver rank | 10 |
+| Augmented-Lagrangian parameter | 10000 |
+| Maximum outer iterations | 10000 |
+| Stopping tolerance | 1e-5 |
+| Chemistry-aware noise | protected local chemistry edges remain unperturbed |
+| BB maximum iterations | 30 |
+| BB xtol | 1e-8 |
+| BB gtol | 1e-8 |
+| BB ftol | 1e-10 |
+| BB initial alpha | 1e-3 |
+| BB rho | 1e-4 |
+| BB sigma | 0.1 |
+| BB eta | 0.8 |
+
+The noisy script writes a condition-specific `sweep_config.mat` and `manifest.csv` beneath each noise-level/seed folder, plus a combined file:
 
 ```text
-configs/exact_targets.csv
+out/noisy_sweep/manifest_all_paper_runs.csv
 ```
 
-The noisy sweep uses:
+## State-specific cases
 
-```text
-configs/noisy_targets.csv
-```
-
-The state-changing examples are listed in:
-
-```text
-configs/state_targets.csv
-```
-
-To run the state-changing examples with the exact sweep, change the `targetCSV` line at the top of `scripts/run_exact_sweep.m` to:
-
-```matlab
-targetCSV = fullfile('configs', 'state_targets.csv');
-```
+The state-specific targets are listed in `configs/state_targets.csv`. Run them with the exact reconstruction workflow using the settings reported in the manuscript.
 
 ## Outputs
 
-Generated outputs are written under `out/` and are ignored by Git.
+Generated outputs are written under `out/` and are ignored by Git. They are reproducible from the public structural inputs and the fixed settings encoded in the scripts.
 
-The exact sweep writes:
+## Version used for the manuscript
 
-```text
-out/exact_sweep/cutoff_05/K_0/<AFDB_ID>/shared/
-out/exact_sweep/cutoff_05/K_0/<AFDB_ID>/runs/init_rand_seed47/
-out/exact_sweep/cutoff_05/K_0/<AFDB_ID>/runs/init_randn_seed47/
-out/exact_sweep/cutoff_05/K_0/<AFDB_ID>/runs/init_floyd/
-out/exact_sweep/cutoff_05/K_0/<AFDB_ID>/runs/init_AF_3D/
-```
-
-The noisy sweep writes:
+At submission, record both an immutable Git tag and the full commit hash here:
 
 ```text
-out/noisy_sweep/cutoff_06/noise_0p003333/noise_seed_006/<AFDB_ID>/shared/
-out/noisy_sweep/cutoff_06/noise_0p003333/noise_seed_006/<AFDB_ID>/runs/init_AF_rank_jitter0p001/
+Commit: [INSERT FULL COMMIT HASH]
 ```
-
-## Requirements
-
-MATLAB with the Bioinformatics Toolbox is required because PDB parsing uses `pdbread`.
