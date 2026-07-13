@@ -1,6 +1,4 @@
 % RUN_NOISY_SWEEP
-% -------------------------------------------------------------------------
-% Paper-only noisy AF-rank sweep.
 %
 % Run from the repository root with:
 %   run('scripts/run_noisy_sweep.m')
