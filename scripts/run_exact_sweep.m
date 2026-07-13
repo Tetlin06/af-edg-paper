@@ -13,11 +13,11 @@
 close all force;
 
 % =========================================================================
-% USER SETTINGS
+% FIXED PAPER SETTINGS
 % =========================================================================
 
 targetCSV  = fullfile('configs', 'exact_targets.csv');
-outRoot    = fullfile('out', 'exact_sweep');
+outRoot    = fullfile('out', 'init_cutoff_sweep');
 trueCutoff = 5;
 randomSeed = 47;
 
@@ -98,10 +98,8 @@ function manifest = run_exact_sweep_impl(targetCSV, outRoot, trueCutoff, randomS
     afdbIDs = strtrim(string(targets.("AFDB ID")));
     afdbIDs = afdbIDs(afdbIDs ~= "");
 
-    seedLabel = format_seed_label(randomSeed);
-
     initCases = struct( ...
-        'variant', {char("init_rand_" + seedLabel), char("init_randn_" + seedLabel), 'init_floyd', 'init_AF_3D'}, ...
+        'variant', {'init_rand_seed47', 'init_randn_seed47', 'init_floyd', 'init_AF_3D'}, ...
         'kind', {'rand', 'randn', 'floyd', 'af3d'} ...
     );
 
@@ -110,11 +108,13 @@ function manifest = run_exact_sweep_impl(targetCSV, outRoot, trueCutoff, randomS
 
     totalRuns = numel(afdbIDs) * numel(initCases);
     runIndex = 0;
-    baseRoot = fullfile(outRoot, format_cutoff_folder(trueCutoff), 'K_0');
+
+    % Fixed exact-branch hierarchy: edgekeep -> cutoff -> protein -> K.
+    cutoffRoot = fullfile(outRoot, 'edgekeep_100', 'cutoff_05');
 
     for pp = 1:numel(afdbIDs)
         afdbID = afdbIDs(pp);
-        proteinRoot = fullfile(baseRoot, safe_name(afdbID));
+        proteinRoot = fullfile(cutoffRoot, safe_name(afdbID), 'K_0');
         sharedDir = fullfile(proteinRoot, 'shared');
         ensure_dir(sharedDir);
 
@@ -233,8 +233,18 @@ function problem = build_shared_problem(targets, targetCSV, mappingCSV, afdbID, 
         'BuildCacheIfMissing', false, ...
         'Verbose', false);
 
+    % Use the complete mapped residue set, matching DomainCut=[] in the
+    % original full sweep.
+    matchedPairs = subset_aligned_pairs(alignment, []);
+
     allpairs = build_aligned_all_atom_pairs( ...
-        alignment, truePdbPath, char(chainID), afPdbPath, 'A');
+        matchedPairs, ...
+        truePdbPath, ...
+        char(chainID), ...
+        afPdbPath, ...
+        'A', ...
+        'AtomSelection', "safe", ...
+        'Verbose', false);
 
     [DistSq, Weight, allatomInfo] = build_allatom_dist_weight_matrix( ...
         allpairs.coords_true_all, trueCutoff, ...
@@ -412,6 +422,8 @@ function [status, msg, elapsedSec] = run_one_initialization(problem, initCase, o
 
         close all force;
 
+        % Save the raw solver coordinates directly. No post-solver
+        % reflection, handedness, chirality, or other transform is present.
         solved_cloud_all = GCor;
         solved_cloud_CA = GCor(problem.ca_rows, :);
         save(solvedPath, 'solved_cloud_all', 'solved_cloud_CA', '-v7.3');
@@ -588,27 +600,6 @@ function txt = scalar_text(col, idx)
 end
 
 % -------------------------------------------------------------------------
-function label = format_seed_label(seed)
-    if abs(seed - round(seed)) < 1e-12
-        label = "seed" + string(round(seed));
-    else
-        txt = sprintf('%.6g', seed);
-        txt = strrep(txt, '.', 'p');
-        txt = strrep(txt, '-', 'm');
-        label = "seed" + string(txt);
-    end
-end
-
-% -------------------------------------------------------------------------
-function folder = format_cutoff_folder(cutoff)
-    if abs(cutoff - round(cutoff)) < 1e-12
-        folder = sprintf('cutoff_%02d', round(cutoff));
-    else
-        folder = sprintf('cutoff_%s', strrep(sprintf('%.3g', cutoff), '.', 'p'));
-    end
-end
-
-% -------------------------------------------------------------------------
 function s = safe_name(x)
     s = regexprep(char(string(x)), '[^\w.-]', '_');
 end
@@ -637,3 +628,4 @@ function write_text(path, txt)
     cleaner = onCleanup(@() fclose(fid)); 
     fprintf(fid, '%s', char(string(txt)));
 end
+
