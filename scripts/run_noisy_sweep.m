@@ -3,9 +3,16 @@
 % Run with:
 %   run('scripts/run_noisy_sweep.m')
 %
-% Output layout:
-%   outRoot/cutoff_06/noise_0p003333/noise_seed_006/<AFDB_ID>/shared/
-%   outRoot/cutoff_06/noise_0p003333/noise_seed_006/<AFDB_ID>/runs/init_AF_rank_jitter0p001/
+% Paper conditions:
+%   nominal noise eta = [0.01, 0.05], implemented as K = eta / 3
+%   noise seeds        = [3, 21, 450, 666, 987]
+%   AF-rank seed       = 47
+%   AF-rank jitter     = 1e-3
+%   maximum iterations = 10000
+%
+% Output layout for each condition:
+%   outRoot/cutoff_06/noise_<K>/noise_seed_<seed>/<AFDB_ID>/shared/
+%   outRoot/cutoff_06/noise_<K>/noise_seed_<seed>/<AFDB_ID>/runs/init_AF_rank_jitter0p001/
 
 close all force;
 
@@ -17,16 +24,26 @@ targetCSV = fullfile('configs', 'noisy_targets.csv');
 outRoot   = fullfile('out', 'noisy_sweep');
 
 trueCutoff = 6;
-noise      = 0.01 / 3;
-noiseSeed  = 6;
-afJitter   = 1e-3;
+
+% Nominal noise levels reported in the manuscript.
+nominalNoiseLevels = [0.01, 0.05];
+
+% The implementation perturbs squared distances with K = eta / 3.
+noiseLevels = nominalNoiseLevels / 3;
+
+% Exact five noise seeds used for the manuscript.
+noiseSeeds = [3, 21, 450, 666, 987];
+
+% AF-rank initialization settings used for every noisy run.
+afEmbedSeed = 47;
+afJitter    = 1e-3;
 
 opts = struct();
 opts.r           = 10000;
 opts.printenergy = 1;
 opts.printerror  = 1;
 opts.rank        = 10;
-opts.maxit       = 2000;
+opts.maxit       = 10000;
 opts.tol         = 1e-5;
 opts.lamda       = opts.r;
 
@@ -41,17 +58,41 @@ lsopts.sigma = 0.1;
 lsopts.eta   = 0.8;
 
 % =========================================================================
-% RUN
+% RUN ALL PAPER CONDITIONS
 % =========================================================================
 
-manifest = run_noisy_sweep_impl( ...
-    targetCSV, outRoot, trueCutoff, noise, noiseSeed, afJitter, opts, lsopts);
+allManifest = table();
+
+for etaIndex = 1:numel(nominalNoiseLevels)
+    nominalEta = nominalNoiseLevels(etaIndex);
+    noise = noiseLevels(etaIndex);
+
+    for seedIndex = 1:numel(noiseSeeds)
+        noiseSeed = noiseSeeds(seedIndex);
+
+        fprintf('\n============================================================\n');
+        fprintf('Nominal eta = %.4g | K = %.8g | noise seed = %d\n', ...
+            nominalEta, noise, noiseSeed);
+        fprintf('============================================================\n');
+
+        thisManifest = run_noisy_sweep_impl( ...
+            targetCSV, outRoot, trueCutoff, nominalEta, noise, noiseSeed, ...
+            afJitter, afEmbedSeed, opts, lsopts);
+
+        allManifest = [allManifest; thisManifest]; 
+    end
+end
+
+ensure_dir(outRoot);
+writetable(allManifest, fullfile(outRoot, 'manifest_all_paper_runs.csv'));
+
+manifest = allManifest;
 
 % =========================================================================
 % LOCAL FUNCTIONS
 % =========================================================================
 
-function manifest = run_noisy_sweep_impl(targetCSV, outRoot, trueCutoff, noise, noiseSeed, afJitter, opts, lsopts)
+function manifest = run_noisy_sweep_impl(targetCSV, outRoot, trueCutoff, nominalEta, noise, noiseSeed, afJitter, afEmbedSeed, opts, lsopts)
 
     repoRoot = find_repo_root();
     cd(repoRoot);
@@ -74,8 +115,16 @@ function manifest = run_noisy_sweep_impl(targetCSV, outRoot, trueCutoff, noise, 
         error('trueCutoff must be a positive numeric scalar.');
     end
 
+    if ~isscalar(nominalEta) || ~isnumeric(nominalEta) || ~isfinite(nominalEta) || nominalEta <= 0
+        error('nominalEta must be a positive numeric scalar.');
+    end
+
     if ~isscalar(noise) || ~isnumeric(noise) || ~isfinite(noise) || noise <= 0
         error('noise must be a positive numeric scalar.');
+    end
+
+    if abs(noise - nominalEta / 3) > 1e-12
+        error('Expected noise = nominalEta / 3.');
     end
 
     if ~isscalar(noiseSeed) || ~isnumeric(noiseSeed) || ~isfinite(noiseSeed)
@@ -86,22 +135,37 @@ function manifest = run_noisy_sweep_impl(targetCSV, outRoot, trueCutoff, noise, 
         error('afJitter must be a nonnegative numeric scalar.');
     end
 
+    if ~isscalar(afEmbedSeed) || ~isnumeric(afEmbedSeed) || ~isfinite(afEmbedSeed)
+        error('afEmbedSeed must be a finite numeric scalar.');
+    end
+
     if ~isfield(opts, 'rank') || opts.rank < 3
         error('opts.rank must be at least 3.');
     end
 
     ensure_dir(outRoot);
 
+    baseRoot = fullfile( ...
+        outRoot, ...
+        format_cutoff_folder(trueCutoff), ...
+        format_noise_folder(noise), ...
+        format_noise_seed_folder(noiseSeed));
+
+    ensure_dir(baseRoot);
+
     run_config = struct();
     run_config.targetCSV = targetCSV;
     run_config.outRoot = outRoot;
+    run_config.baseRoot = baseRoot;
     run_config.trueCutoff = trueCutoff;
+    run_config.nominalEta = nominalEta;
     run_config.noise = noise;
     run_config.noiseSeed = noiseSeed;
     run_config.afJitter = afJitter;
+    run_config.afEmbedSeed = afEmbedSeed;
     run_config.opts = opts;
     run_config.lsopts = lsopts;
-    save(fullfile(outRoot, 'sweep_config.mat'), 'run_config', '-v7.3');
+    save(fullfile(baseRoot, 'sweep_config.mat'), 'run_config', '-v7.3');
 
     targets = readtable(targetCSV, 'FileType', 'text', 'VariableNamingRule', 'preserve');
     validate_target_table(targets, targetCSV);
@@ -112,16 +176,10 @@ function manifest = run_noisy_sweep_impl(targetCSV, outRoot, trueCutoff, noise, 
     initVariant = "init_AF_rank_jitter" + format_float_token(afJitter);
 
     manifestRecords = init_manifest_records();
-    manifestPath = fullfile(outRoot, 'manifest.csv');
+    manifestPath = fullfile(baseRoot, 'manifest.csv');
 
     totalRuns = numel(afdbIDs);
     runIndex = 0;
-
-    baseRoot = fullfile( ...
-        outRoot, ...
-        format_cutoff_folder(trueCutoff), ...
-        format_noise_folder(noise), ...
-        format_noise_seed_folder(noiseSeed));
 
     for pp = 1:numel(afdbIDs)
         runIndex = runIndex + 1;
@@ -134,7 +192,8 @@ function manifest = run_noisy_sweep_impl(targetCSV, outRoot, trueCutoff, noise, 
         ensure_dir(runDir);
 
         [problem, sharedStatus, sharedMsg] = build_shared_problem_safely( ...
-            targets, targetCSV, mappingCSV, afdbID, trueCutoff, noise, noiseSeed, afJitter, opts, sharedDir);
+            targets, targetCSV, mappingCSV, afdbID, trueCutoff, nominalEta, noise, ...
+            noiseSeed, afJitter, afEmbedSeed, opts, sharedDir);
 
         if sharedStatus ~= "ok"
             write_text(fullfile(runDir, 'status.txt'), "failed_shared_build");
@@ -144,13 +203,16 @@ function manifest = run_noisy_sweep_impl(targetCSV, outRoot, trueCutoff, noise, 
             output.status = "failed_shared_build";
             output.error_message = sharedMsg;
             output.initialization = "AF_rank";
+            output.nominal_eta = nominalEta;
             output.noise = noise;
             output.noise_seed = noiseSeed;
             output.af_jitter = afJitter;
+            output.af_embed_seed = afEmbedSeed;
             save(fullfile(runDir, 'solver_output.mat'), 'output', '-v7.3');
 
             rec = make_manifest_record(runIndex, totalRuns, afdbID, "", "", trueCutoff, ...
-                noise, noiseSeed, afJitter, initVariant, "failed_shared_build", sharedMsg, ...
+                nominalEta, noise, noiseSeed, afJitter, afEmbedSeed, initVariant, ...
+                "failed_shared_build", sharedMsg, ...
                 NaN, NaN, NaN, NaN, runDir);
 
             manifestRecords = append_record(manifestRecords, rec);
@@ -163,7 +225,7 @@ function manifest = run_noisy_sweep_impl(targetCSV, outRoot, trueCutoff, noise, 
 
         rec = make_manifest_record(runIndex, totalRuns, ...
             problem.afdb_id, problem.pdb_id, problem.chain_id, trueCutoff, ...
-            noise, noiseSeed, afJitter, initVariant, status, msg, ...
+            nominalEta, noise, noiseSeed, afJitter, afEmbedSeed, initVariant, status, msg, ...
             problem.n_nodes, problem.n_edges, problem.coverage, elapsedSec, runDir);
 
         manifestRecords = append_record(manifestRecords, rec);
@@ -176,7 +238,8 @@ end
 
 % -------------------------------------------------------------------------
 function [problem, status, msg] = build_shared_problem_safely( ...
-    targets, targetCSV, mappingCSV, afdbID, trueCutoff, noise, noiseSeed, afJitter, opts, sharedDir)
+    targets, targetCSV, mappingCSV, afdbID, trueCutoff, nominalEta, noise, ...
+    noiseSeed, afJitter, afEmbedSeed, opts, sharedDir)
 
     logPath = fullfile(sharedDir, 'log.txt');
     statusPath = fullfile(sharedDir, 'status.txt');
@@ -189,7 +252,8 @@ function [problem, status, msg] = build_shared_problem_safely( ...
 
     try
         captured = evalc(['problem = build_shared_problem(', ...
-            'targets, targetCSV, mappingCSV, afdbID, trueCutoff, noise, noiseSeed, afJitter, opts);']);
+            'targets, targetCSV, mappingCSV, afdbID, trueCutoff, nominalEta, noise, ', ...
+            'noiseSeed, afJitter, afEmbedSeed, opts);']);
 
         status = "ok";
         msg = "";
@@ -206,7 +270,7 @@ function [problem, status, msg] = build_shared_problem_safely( ...
 end
 
 % -------------------------------------------------------------------------
-function problem = build_shared_problem(targets, targetCSV, mappingCSV, afdbID, trueCutoff, noise, noiseSeed, afJitter, opts)
+function problem = build_shared_problem(targets, targetCSV, mappingCSV, afdbID, trueCutoff, nominalEta, noise, noiseSeed, afJitter, afEmbedSeed, opts)
 
     row = targets(strcmpi(strtrim(string(targets.("AFDB ID"))), string(afdbID)), :);
 
@@ -258,16 +322,18 @@ function problem = build_shared_problem(targets, targetCSV, mappingCSV, afdbID, 
     end
 
     Pinit3 = allpairs.coords_af_all - mean(allpairs.coords_af_all, 1);
-    [pointInitial, afQ] = af_embed_highdim(Pinit3, opts.rank, 47, afJitter);
+    [pointInitial, afQ] = af_embed_highdim(Pinit3, opts.rank, afEmbedSeed, afJitter);
 
     problem = struct();
     problem.afdb_id = string(afdbID);
     problem.pdb_id = string(pdbID);
     problem.chain_id = string(chainID);
     problem.true_cutoff = trueCutoff;
+    problem.nominal_eta = nominalEta;
     problem.noise = noise;
     problem.noise_seed = noiseSeed;
     problem.af_jitter = afJitter;
+    problem.af_embed_seed = afEmbedSeed;
     problem.truePdbPath = string(truePdbPath);
     problem.afPdbPath = string(afPdbPath);
     problem.alignment = alignment;
@@ -317,6 +383,7 @@ function save_shared_problem(problem, sharedDir)
 
     constraint_info = struct();
     constraint_info.true_cutoff = problem.true_cutoff;
+    constraint_info.nominal_eta = problem.nominal_eta;
     constraint_info.noise = problem.noise;
     constraint_info.noise_seed = problem.noise_seed;
     constraint_info.n_nodes = problem.n_nodes;
@@ -339,9 +406,11 @@ function save_shared_problem(problem, sharedDir)
     metadata.pdb_id = problem.pdb_id;
     metadata.chain_id = problem.chain_id;
     metadata.true_cutoff = problem.true_cutoff;
+    metadata.nominal_eta = problem.nominal_eta;
     metadata.noise = problem.noise;
     metadata.noise_seed = problem.noise_seed;
     metadata.af_jitter = problem.af_jitter;
+    metadata.af_embed_seed = problem.af_embed_seed;
     metadata.truePdbPath = problem.truePdbPath;
     metadata.afPdbPath = problem.afPdbPath;
     metadata.connectivity = problem.connectivity;
@@ -385,9 +454,11 @@ function [status, msg, elapsedSec] = run_one_af_rank(problem, opts, lsopts, runD
 
         output.status = "ok";
         output.initialization = "AF_rank";
+        output.nominal_eta = problem.nominal_eta;
         output.noise = problem.noise;
         output.noise_seed = problem.noise_seed;
         output.af_jitter = problem.af_jitter;
+        output.af_embed_seed = problem.af_embed_seed;
         save(outputPath, 'output', 'IPM_Recon', '-v7.3');
 
         status = "ok";
@@ -405,9 +476,11 @@ function [status, msg, elapsedSec] = run_one_af_rank(problem, opts, lsopts, runD
         output = struct();
         output.status = status;
         output.initialization = "AF_rank";
+        output.nominal_eta = problem.nominal_eta;
         output.noise = problem.noise;
         output.noise_seed = problem.noise_seed;
         output.af_jitter = problem.af_jitter;
+        output.af_embed_seed = problem.af_embed_seed;
         output.error_message = msg;
         output.error_report = string(report);
         output.numit = NaN;
@@ -457,15 +530,17 @@ end
 function records = init_manifest_records()
     records = struct( ...
         'run_index', {}, 'total_runs', {}, 'afdb_id', {}, 'pdb_id', {}, ...
-        'chain_id', {}, 'cutoff', {}, 'noise', {}, 'noise_seed', {}, ...
-        'af_jitter', {}, 'init_variant', {}, 'init_method', {}, 'status', {}, ...
+        'chain_id', {}, 'cutoff', {}, 'nominal_eta', {}, 'noise', {}, ...
+        'noise_seed', {}, 'af_jitter', {}, 'af_embed_seed', {}, ...
+        'init_variant', {}, 'init_method', {}, 'status', {}, ...
         'message', {}, 'n_nodes', {}, 'n_edges', {}, 'coverage', {}, ...
         'elapsed_sec', {}, 'run_dir', {});
 end
 
 % -------------------------------------------------------------------------
 function rec = make_manifest_record(runIndex, totalRuns, afdbID, pdbID, chainID, cutoff, ...
-    noise, noiseSeed, afJitter, initVariant, status, msg, nNodes, nEdges, coverage, elapsedSec, runDir)
+    nominalEta, noise, noiseSeed, afJitter, afEmbedSeed, initVariant, status, msg, ...
+    nNodes, nEdges, coverage, elapsedSec, runDir)
 
     rec = struct();
     rec.run_index = runIndex;
@@ -474,9 +549,11 @@ function rec = make_manifest_record(runIndex, totalRuns, afdbID, pdbID, chainID,
     rec.pdb_id = string(pdbID);
     rec.chain_id = string(chainID);
     rec.cutoff = cutoff;
+    rec.nominal_eta = nominalEta;
     rec.noise = noise;
     rec.noise_seed = noiseSeed;
     rec.af_jitter = afJitter;
+    rec.af_embed_seed = afEmbedSeed;
     rec.init_variant = string(initVariant);
     rec.init_method = "AF_rank";
     rec.status = string(status);
