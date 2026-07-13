@@ -110,7 +110,7 @@ function manifest = run_exact_sweep_impl(targetCSV, outRoot, trueCutoff, randomS
     runIndex = 0;
 
     % Fixed exact-branch hierarchy: edgekeep -> cutoff -> protein -> K.
-    cutoffRoot = fullfile(outRoot, 'edgekeep_100', 'cutoff_05');
+    cutoffRoot = fullfile(outRoot, 'cutoff_05');
 
     for pp = 1:numel(afdbIDs)
         afdbID = afdbIDs(pp);
