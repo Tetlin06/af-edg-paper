@@ -1,9 +1,16 @@
 % RUN_NOISY_SWEEP
+% -------------------------------------------------------------------------
+% Noisy all-atom AF-rank reconstruction sweep used in the manuscript.
 %
-% Run with:
+% Run from the repository root with:
 %   run('scripts/run_noisy_sweep.m')
 %
+% The script uses SIFTS/UniProt residue mapping, safe all-atom matching,
+% a 6 Angstrom distance cutoff, chemistry-aware distance perturbations,
+% AF-rank initialization, and the alternating_completion_noisy solver.
+%
 % Output layout:
+%
 %   outRoot/cutoff_06/<AFDB_ID>/K_0p00333/
 %       noise_seed_003/shared/
 %       noise_seed_003/runs/init_AF_rank_jitter1e-3/
@@ -14,7 +21,7 @@
 %
 % The remaining seeds use noise_seed_021, noise_seed_450,
 % noise_seed_666, and noise_seed_987.
-
+%
 close all force;
 
 % =========================================================================
@@ -95,13 +102,10 @@ function manifest = run_noisy_sweep_impl( ...
 
     ensure_dir(outRoot);
 
-    % Save one immutable description of the complete paper sweep at outRoot,
-    % matching the top-level convention used by run_init_cutoff_sweep.
+    % Save the settings for the complete noisy benchmark.
     cfg = struct();
     cfg.TargetCSV = targetCSV;
     cfg.OutRoot = outRoot;
-    cfg.EdgeKeepFraction = 1;
-    cfg.EdgeKeepFolder = "edgekeep_100";
     cfg.TrueCutoff = trueCutoff;
     cfg.NominalNoiseLevels = nominalNoiseLevels(:).';
     cfg.KValues = KValues(:).';
@@ -128,7 +132,6 @@ function manifest = run_noisy_sweep_impl( ...
     afdbIDs = strtrim(string(targets.("AFDB ID")));
     afdbIDs = afdbIDs(afdbIDs ~= "");
 
-    edgeKeepFraction = 1;
     cutoffRoot = fullfile(outRoot, format_cutoff_folder(trueCutoff));
     initVariant = char("init_AF_rank_jitter" + string(format_jitter(afRankJitter)));
 
@@ -184,8 +187,6 @@ function manifest = run_noisy_sweep_impl( ...
                     output = struct();
                     output.status = "failed_shared_build";
                     output.error_message = sharedMsg;
-                    output.edge_keep_fraction = edgeKeepFraction;
-                    output.edge_keep_folder = "edgekeep_100";
                     output.K = K;
                     output.noise_seed = noiseSeed;
                     output.noise_seed_folder = string(format_noise_seed_folder(noiseSeed));
@@ -195,7 +196,7 @@ function manifest = run_noisy_sweep_impl( ...
                     save(fullfile(runDir, 'solver_output.mat'), 'output', '-v7.3');
 
                     rec = make_manifest_record( ...
-                        runIndex, totalRuns, edgeKeepFraction, noiseSeed, ...
+                        runIndex, totalRuns, noiseSeed, ...
                         afdbID, "", "", trueCutoff, K, initVariant, ...
                         "failed_shared_build", sharedMsg, ...
                         NaN, NaN, NaN, NaN, NaN, runDir);
@@ -212,7 +213,7 @@ function manifest = run_noisy_sweep_impl( ...
                     opts, lsopts, runDir);
 
                 rec = make_manifest_record( ...
-                    runIndex, totalRuns, edgeKeepFraction, noiseSeed, ...
+                    runIndex, totalRuns, noiseSeed, ...
                     problem.afdb_id, problem.pdb_id, problem.chain_id, ...
                     trueCutoff, K, initVariant, status, msg, ...
                     problem.n_nodes, problem.n_edges, problem.coverage, ...
@@ -342,8 +343,7 @@ function problem = build_shared_problem( ...
         error('AlphaFold PDB file not found: %s', afPdbPath);
     end
 
-    % Official PDB/SIFTS-to-UniProt mapping, followed by the same full matched
-    % subset construction used by run_init_cutoff_sweep.
+    % Build the residue correspondence from PDB/SIFTS-to-UniProt mapping.
     outAlign = align_true_vs_af_by_uniprot_mapping( ...
         targetCSV, ...
         afdbID, ...
@@ -353,9 +353,8 @@ function problem = build_shared_problem( ...
 
     sub = subset_aligned_pairs(outAlign, []);
 
-    % Residue-level AF coordinates are retained only to construct the same
-    % CA-evaluation metadata saved by run_init_cutoff_sweep.
-    [~, coordsAfResidue] = load_ca_plddt(afPdbPath, 'A');
+    % Build the C-alpha evaluation correspondence.
+    [~, coordsAfResidue] = load_ca_sequence_coords(afPdbPath, 'A');
     coordsAfMatchedCA = coordsAfResidue(sub.idxA, :);
 
     allpairs = build_aligned_all_atom_pairs( ...
@@ -374,8 +373,7 @@ function problem = build_shared_problem( ...
         'MinSeqSep', 0, ...
         'Verbose', false);
 
-    % The complete cutoff graph is used exactly as built. There is no edge
-    % subsampling and there are no added true or AlphaFold-derived edges.
+    % Normalize the cutoff-defined distance graph.
     Weight = double(Weight ~= 0);
     Weight = double((Weight + Weight') > 0);
     Weight(1:size(Weight, 1)+1:end) = 0;
@@ -411,8 +409,6 @@ function problem = build_shared_problem( ...
     problem.pdb_id = string(pdbID);
     problem.chain_id = string(chainID);
 
-    problem.edge_keep_fraction = 1;
-    problem.edge_keep_folder = "edgekeep_100";
     problem.true_cutoff = trueCutoff;
     problem.nominal_eta = nominalEta;
     problem.K = K;
@@ -464,8 +460,7 @@ function save_shared_problem(problem, sharedDir)
         'af_cloud_CA', ...
         '-v7.3');
 
-    % Preserve the run_init_cutoff_sweep initials.mat convention, while
-    % storing only the one initialization that this stripped runner uses.
+    % Save the AF-rank initialization.
     initials = struct();
     initials.(afrank_fieldname(problem.af_rank_jitter)) = problem.pointInitial;
 
@@ -475,8 +470,6 @@ function save_shared_problem(problem, sharedDir)
     Dsq_used = sparse_weighted_dist_sq(problem.DistSq, problem.Weight);
 
     constraint_info = struct();
-    constraint_info.edge_keep_fraction = problem.edge_keep_fraction;
-    constraint_info.edge_keep_folder = problem.edge_keep_folder;
     constraint_info.true_cutoff = problem.true_cutoff;
     constraint_info.nominal_eta = problem.nominal_eta;
     constraint_info.K = problem.K;
@@ -505,8 +498,6 @@ function save_shared_problem(problem, sharedDir)
     metadata.afdb_id = problem.afdb_id;
     metadata.pdb_id = problem.pdb_id;
     metadata.chain_id = problem.chain_id;
-    metadata.edge_keep_fraction = problem.edge_keep_fraction;
-    metadata.edge_keep_folder = problem.edge_keep_folder;
     metadata.true_cutoff = problem.true_cutoff;
     metadata.nominal_eta = problem.nominal_eta;
     metadata.K = problem.K;
@@ -561,7 +552,7 @@ function [status, msg, elapsedSec] = run_one_af_rank_noisy( ...
 
         close all force;
 
-        % No handedness/chirality post-processing is present in this runner.
+        % Save the reconstructed coordinates.
         solved_cloud_all = GCor;
         solved_cloud_CA = GCor(problem.ca_eval_rows, :);
 
@@ -571,8 +562,6 @@ function [status, msg, elapsedSec] = run_one_af_rank_noisy( ...
             '-v7.3');
 
         output.status = "ok";
-        output.edge_keep_fraction = problem.edge_keep_fraction;
-        output.edge_keep_folder = problem.edge_keep_folder;
         output.nominal_eta = problem.nominal_eta;
         output.K = problem.K;
         output.noise_seed = problem.noise_seed;
@@ -595,8 +584,6 @@ function [status, msg, elapsedSec] = run_one_af_rank_noisy( ...
 
         output = struct();
         output.status = status;
-        output.edge_keep_fraction = problem.edge_keep_fraction;
-        output.edge_keep_folder = problem.edge_keep_folder;
         output.nominal_eta = problem.nominal_eta;
         output.K = problem.K;
         output.noise_seed = problem.noise_seed;
@@ -618,7 +605,6 @@ function initInfo = fixed_init_info(initVariant, afRankSeed, afRankJitter)
     initInfo = struct();
     initInfo.variant = string(initVariant);
     initInfo.method = "AF_rank";
-    initInfo.random_type = "";
     initInfo.seed = afRankSeed;
     initInfo.jitter = afRankJitter;
 end
@@ -711,8 +697,6 @@ function records = init_manifest_records()
     records = struct( ...
         'run_index', {}, ...
         'total_runs', {}, ...
-        'edge_keep_fraction', {}, ...
-        'edge_keep_folder', {}, ...
         'cutoff', {}, ...
         'K', {}, ...
         'noise_seed', {}, ...
@@ -737,15 +721,13 @@ end
 
 % -------------------------------------------------------------------------
 function rec = make_manifest_record( ...
-    runIndex, totalRuns, edgeKeepFraction, noiseSeed, ...
+    runIndex, totalRuns, noiseSeed, ...
     afdbID, pdbID, chainID, cutoff, K, initVariant, status, msg, ...
     nNodes, nEdges, coverage, nComponents, elapsedSec, runDir)
 
     rec = struct();
     rec.run_index = runIndex;
     rec.total_runs = totalRuns;
-    rec.edge_keep_fraction = edgeKeepFraction;
-    rec.edge_keep_folder = string(format_edgekeep_folder(edgeKeepFraction));
     rec.cutoff = cutoff;
     rec.K = K;
     rec.noise_seed = noiseSeed;
@@ -823,20 +805,6 @@ function textValue = scalar_text(column, index)
     end
 
     textValue = strtrim(textValue);
-end
-
-% -------------------------------------------------------------------------
-function folder = format_edgekeep_folder(keepFraction)
-    percent = 100 * keepFraction;
-
-    if abs(percent - round(percent)) < 1e-10
-        folder = sprintf('edgekeep_%03d', round(percent));
-    else
-        textValue = sprintf('%.3g', percent);
-        textValue = strrep(textValue, '.', 'p');
-        textValue = strrep(textValue, '-', 'm');
-        folder = ['edgekeep_', textValue];
-    end
 end
 
 % -------------------------------------------------------------------------
