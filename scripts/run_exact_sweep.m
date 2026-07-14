@@ -1,15 +1,22 @@
 % RUN_EXACT_SWEEP
+% -------------------------------------------------------------------------
+% Exact all-atom reconstruction sweep used in the manuscript.
 %
-% Run with:
+% Run from the repository root with:
 %   run('scripts/run_exact_sweep.m')
 %
+% The script uses SIFTS/UniProt residue mapping, safe all-atom matching,
+% a 5 Angstrom distance cutoff, four fixed initializations, and the
+% alternating_completion solver.
+%
 % Output layout:
-%   outRoot/cutoff_05/K_0/<AFDB_ID>/shared/
-%   outRoot/cutoff_05/K_0/<AFDB_ID>/runs/init_rand_seed47/
-%   outRoot/cutoff_05/K_0/<AFDB_ID>/runs/init_randn_seed47/
-%   outRoot/cutoff_05/K_0/<AFDB_ID>/runs/init_floyd/
-%   outRoot/cutoff_05/K_0/<AFDB_ID>/runs/init_AF_3D/
-
+%
+%   outRoot/cutoff_05/<AFDB_ID>/K_0/shared/
+%   outRoot/cutoff_05/<AFDB_ID>/K_0/runs/init_rand_seed47/
+%   outRoot/cutoff_05/<AFDB_ID>/K_0/runs/init_randn_seed47/
+%   outRoot/cutoff_05/<AFDB_ID>/K_0/runs/init_floyd/
+%   outRoot/cutoff_05/<AFDB_ID>/K_0/runs/init_AF_3D/
+%
 close all force;
 
 % =========================================================================
@@ -109,7 +116,7 @@ function manifest = run_exact_sweep_impl(targetCSV, outRoot, trueCutoff, randomS
     totalRuns = numel(afdbIDs) * numel(initCases);
     runIndex = 0;
 
-    % Fixed exact-branch hierarchy: edgekeep -> cutoff -> protein -> K.
+    % Output hierarchy: cutoff -> protein -> condition.
     cutoffRoot = fullfile(outRoot, 'cutoff_05');
 
     for pp = 1:numel(afdbIDs)
@@ -233,8 +240,7 @@ function problem = build_shared_problem(targets, targetCSV, mappingCSV, afdbID, 
         'BuildCacheIfMissing', false, ...
         'Verbose', false);
 
-    % Use the complete mapped residue set, matching DomainCut=[] in the
-    % original full sweep.
+    % Retain the complete mapped residue set.
     matchedPairs = subset_aligned_pairs(alignment, []);
 
     allpairs = build_aligned_all_atom_pairs( ...
@@ -422,8 +428,7 @@ function [status, msg, elapsedSec] = run_one_initialization(problem, initCase, o
 
         close all force;
 
-        % Save the raw solver coordinates directly. No post-solver
-        % reflection, handedness, chirality, or other transform is present.
+        % Save the reconstructed coordinates.
         solved_cloud_all = GCor;
         solved_cloud_CA = GCor(problem.ca_rows, :);
         save(solvedPath, 'solved_cloud_all', 'solved_cloud_CA', '-v7.3');
@@ -628,4 +633,3 @@ function write_text(path, txt)
     cleaner = onCleanup(@() fclose(fid)); 
     fprintf(fid, '%s', char(string(txt)));
 end
-
