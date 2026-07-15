@@ -174,3 +174,8 @@ Each script also writes:
 out/init_cutoff_sweep/sweep_config.mat
 out/init_cutoff_sweep/manifest.csv
 ```
+
+The public runners save matched point clouds, retained constraints,
+initial coordinates, reconstructed coordinates, and solver diagnostics.
+They do not regenerate manuscript tables or figures. Reported numerical
+results are provided in the manuscript tables and Supplementary Data 1.
